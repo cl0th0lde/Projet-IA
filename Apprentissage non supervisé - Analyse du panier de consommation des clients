@@ -1,0 +1,99 @@
+# 📦 Import des bibliothèques
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans, DBSCAN
+from sklearn.metrics import silhouette_score
+from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
+
+# 🗂️ 1. Chargement et exploration du dataset
+df = pd.read_csv("Mall_Customers.csv")
+
+# 👀 Aperçu des données
+print(df.head())
+print(df.info())
+print(df.describe())
+
+# 🧼 Nettoyage (si nécessaire)
+df.dropna(inplace=True)
+
+# 🎯 Variables pertinentes pour segmentation
+features = ['Age', 'Annual Income (k$)', 'Spending Score (1-100)']
+
+# 📊 Visualisation initiale
+sns.pairplot(df[features])
+plt.suptitle("Relations entre les variables", y=1.02)
+plt.show()
+
+# 🧮 Normalisation des variables
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(df[features])
+
+# 🔍 2. K-Means clustering
+
+# 🔢 Trouver le nombre optimal de clusters avec méthode du coude
+inertias = []
+for k in range(1, 11):
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(X_scaled)
+    inertias.append(kmeans.inertia_)
+
+plt.plot(range(1, 11), inertias, marker='o')
+plt.title('Méthode du coude - KMeans')
+plt.xlabel('Nombre de clusters')
+plt.ylabel('Inertie')
+plt.grid()
+plt.show()
+
+# 📌 Supposons k=5 après observation du coude
+kmeans = KMeans(n_clusters=5, random_state=42)
+df['cluster_kmeans'] = kmeans.fit_predict(X_scaled)
+
+# 📊 Visualisation des clusters KMeans
+plt.figure(figsize=(10,6))
+sns.scatterplot(x=df['Annual Income (k$)'], y=df['Spending Score (1-100)'], hue=df['cluster_kmeans'], palette='Set2')
+plt.title("Clusters KMeans : Revenu vs Score de dépenses")
+plt.show()
+
+# ✳️ Interprétation des groupes KMeans
+print(df.groupby('cluster_kmeans')[features].mean())
+
+# 🔍 3. DBSCAN clustering
+
+dbscan = DBSCAN(eps=0.8, min_samples=5)
+df['cluster_dbscan'] = dbscan.fit_predict(X_scaled)
+
+# 📊 Visualisation des clusters DBSCAN
+plt.figure(figsize=(10,6))
+sns.scatterplot(x=df['Annual Income (k$)'], y=df['Spending Score (1-100)'], hue=df['cluster_dbscan'], palette='tab10')
+plt.title("Clusters DBSCAN : Revenu vs Score de dépenses")
+plt.show()
+
+# ✳️ Interprétation des groupes DBSCAN
+print(df['cluster_dbscan'].value_counts())
+print(df.groupby('cluster_dbscan')[features].mean())
+
+# 🧬 Bonus : Clustering hiérarchique (CAH)
+linked = linkage(X_scaled, method='ward')
+
+plt.figure(figsize=(12,6))
+dendrogram(linked)
+plt.title('Dendrogramme (CAH)')
+plt.xlabel('Clients')
+plt.ylabel('Distance')
+plt.show()
+
+# Découpage en 4 clusters à partir du dendrogramme
+df['cluster_cah'] = fcluster(linked, 4, criterion='maxclust')
+
+# 📊 Visualisation CAH
+plt.figure(figsize=(10,6))
+sns.scatterplot(x=df['Annual Income (k$)'], y=df['Spending Score (1-100)'], hue=df['cluster_cah'], palette='Set1')
+plt.title("Clusters CAH : Revenu vs Score de dépenses")
+plt.show()
+
+# ✳️ Interprétation des groupes CAH
+print(df.groupby('cluster_cah')[features].mean())
