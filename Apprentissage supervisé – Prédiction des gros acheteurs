@@ -1,0 +1,101 @@
+# 📦 Import des bibliothèques nécessaires
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, classification_report
+
+# 🗂️ 1. Chargement des données
+df = pd.read_csv("customer_shopping_data.csv")
+
+# 👀 Aperçu des données
+print(df.head())
+print(df.info())
+print(df.describe())
+
+# 🧹 Nettoyage
+df.drop_duplicates(inplace=True)
+df.dropna(inplace=True)  # On enlève les lignes avec valeurs manquantes
+
+# ➕ Création de la variable 'total'
+df['total'] = df['quantity'] * df['price']
+
+# 📊 Analyse exploratoire rapide
+plt.figure(figsize=(10,5))
+sns.histplot(df['total'], kde=True)
+plt.title("Distribution des dépenses totales")
+plt.show()
+
+sns.boxplot(x='gender', y='total', data=df)
+plt.title("Total dépensé par genre")
+plt.show()
+
+plt.figure(figsize=(12,6))
+sns.countplot(x='category', data=df)
+plt.title("Répartition des catégories d'achat")
+plt.xticks(rotation=45)
+plt.show()
+
+# 🔥 Heatmap de corrélation
+sns.heatmap(df.select_dtypes(include=[np.number]).corr(), annot=True, cmap="coolwarm")
+plt.title("Corrélation entre variables numériques")
+plt.show()
+
+# 🎯 2. Création de la variable cible
+seuil = df['total'].quantile(0.75)
+df['gros_acheteur'] = (df['total'] > seuil).astype(int)
+
+# 🧠 Sélection des variables explicatives
+features = ['age', 'gender', 'category', 'shopping_mall']
+df_model = df[features + ['gros_acheteur']].copy()
+
+# 🎭 Encodage des variables catégorielles
+df_model = pd.get_dummies(df_model, columns=['gender', 'category', 'shopping_mall'], drop_first=True)
+
+# 🧪 Séparation des variables X et y
+X = df_model.drop('gros_acheteur', axis=1)
+y = df_model['gros_acheteur']
+
+# 🔀 Train/Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# ⚖️ Standardisation (facultative ici, utile pour régression logistique)
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+# 🧪 1er modèle : Régression Logistique
+logreg = LogisticRegression()
+logreg.fit(X_train, y_train)
+y_pred_lr = logreg.predict(X_test)
+
+# 🌳 2e modèle : Random Forest
+rf = RandomForestClassifier(random_state=42)
+rf.fit(X_train, y_train)
+y_pred_rf = rf.predict(X_test)
+
+# 📈 Évaluation des performances
+def eval_model(y_true, y_pred, model_name):
+    print(f"\n🔍 Résultats pour {model_name}")
+    print("Accuracy:", accuracy_score(y_true, y_pred))
+    print("Precision:", precision_score(y_true, y_pred))
+    print("Recall:", recall_score(y_true, y_pred))
+    print("F1 Score:", f1_score(y_true, y_pred))
+    print("\nClassification Report:")
+    print(classification_report(y_true, y_pred))
+
+    cm = confusion_matrix(y_true, y_pred)
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+    plt.title(f"Matrice de confusion - {model_name}")
+    plt.xlabel("Prédit")
+    plt.ylabel("Réel")
+    plt.show()
+
+# Évaluation
+eval_model(y_test, y_pred_lr, "Régression Logistique")
+eval_model(y_test, y_pred_rf, "Random Forest")
